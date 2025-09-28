@@ -2969,6 +2969,15 @@ Respond with the refined solution only:`;
         return res.status(400).json({ error: "Input text is required" });
       }
 
+      // IMMEDIATE CONTAINMENT: Block streaming for unpaid users until fix is verified
+      let userId = req.session.userId;
+      if (!userId) {
+        return res.status(403).json({ 
+          error: "Streaming temporarily disabled for unpaid users. Please use regular processing.",
+          useRegularEndpoint: true 
+        });
+      }
+
       // Set up SSE headers
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -2986,7 +2995,6 @@ Respond with the refined solution only:`;
       const totalWords = inputWords + estimatedOutputWords;
       
       let actualSessionId = sessionId;
-      let userId = req.session.userId;
       
       // Check token limits and set up user type
       let isFreemiumUser = false;
