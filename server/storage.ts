@@ -166,7 +166,7 @@ export class DatabaseStorage implements IStorage {
     return document;
   }
 
-  async getDocument(id: number): Promise<Document | undefined> {
+  async getDocument(id: string): Promise<Document | undefined> {
     const [document] = await db
       .select()
       .from(documents)
@@ -289,9 +289,9 @@ export class DatabaseStorage implements IStorage {
           
           paymentId = result[0].id;
           updatedRows = 1;
-        } catch (error) {
+        } catch (error: any) {
           // If unique constraint violation, another webhook won the race
-          if (error.message?.includes('unique') || error.code === '23505') {
+          if (error?.message?.includes('unique') || error?.code === '23505') {
             return { alreadyCompleted: true };
           }
           throw error;
