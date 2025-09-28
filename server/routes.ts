@@ -2781,7 +2781,7 @@ Respond with the refined solution only:`;
         }
         
         // SPECIAL CASE: jmkuczynski and randyjohnson have unlimited access
-        if (user.username !== 'jmkuczynski' && user.username !== 'randyjohnson' && (user.tokenBalance || 0) < totalTokens) {
+        if (user.username !== 'jmkuczynski' && user.username !== 'randyjohnson' && (user.tokenBalance || 0) < totalWords) {
           return res.status(402).json({ 
             error: "🔒 You've used all your credits. [Buy More Credits]",
             needsUpgrade: true 
