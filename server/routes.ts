@@ -2988,7 +2988,8 @@ Respond with the refined solution only:`;
       let actualSessionId = sessionId;
       let userId = req.session.userId;
       
-      // Check token limits
+      // Check token limits and set up user type
+      let isFreemiumUser = false;
       if (userId) {
         // Registered user - check token balance
         const user = await authService.getUserById(userId);
@@ -3005,6 +3006,12 @@ Respond with the refined solution only:`;
           })}\n\n`);
           return res.end();
         }
+      } else {
+        // Free user - will get preview
+        isFreemiumUser = true;
+        if (!actualSessionId) {
+          actualSessionId = generateSessionId();
+        }
       }
       
       // Send initial status
@@ -3012,15 +3019,33 @@ Respond with the refined solution only:`;
 
       // Process with streaming
       let fullResponse = '';
+      let finalResponse = '';
       let graphData: GraphRequest[] = [];
       
       if (llmProvider === 'anthropic') {
-        const result = await processWithAnthropicStream(inputText, (chunk: string) => {
-          fullResponse += chunk;
-          res.write(`data: ${JSON.stringify({type: 'chunk', data: chunk})}\n\n`);
-        });
-        fullResponse = result.response;
-        graphData = result.graphData || [];
+        if (isFreemiumUser) {
+          // For freemium users: generate full response first, then stream preview
+          const result = await processWithAnthropicStream(inputText, () => {
+            // Don't stream chunks for freemium users
+          });
+          fullResponse = result.response;
+          graphData = result.graphData || [];
+          
+          // Generate preview from full response
+          finalResponse = generatePreview(fullResponse);
+          
+          // Stream the preview
+          res.write(`data: ${JSON.stringify({type: 'chunk', data: finalResponse})}\n\n`);
+        } else {
+          // For paid users: stream the full response as it's generated
+          const result = await processWithAnthropicStream(inputText, (chunk: string) => {
+            fullResponse += chunk;
+            res.write(`data: ${JSON.stringify({type: 'chunk', data: chunk})}\n\n`);
+          });
+          fullResponse = result.response;
+          finalResponse = fullResponse;
+          graphData = result.graphData || [];
+        }
       } else {
         // Fallback to non-streaming for other providers
         let llmResult: {response: string, graphData?: GraphRequest[]};
@@ -3040,18 +3065,25 @@ Respond with the refined solution only:`;
         fullResponse = llmResult.response;
         graphData = llmResult.graphData || [];
         
-        // Send the full response at once for non-streaming providers
-        res.write(`data: ${JSON.stringify({type: 'chunk', data: fullResponse})}\n\n`);
+        if (isFreemiumUser) {
+          // Generate preview for freemium users
+          finalResponse = generatePreview(fullResponse);
+        } else {
+          finalResponse = fullResponse;
+        }
+        
+        // Send the response (preview for freemium, full for paid)
+        res.write(`data: ${JSON.stringify({type: 'chunk', data: finalResponse})}\n\n`);
       }
       
       const processingTime = Date.now() - startTime;
-      const actualOutputWords = countWords(fullResponse);
+      const actualOutputWords = countWords(finalResponse);
       
-      // Generate graphs if required
+      // Generate graphs if required (no graphs for freemium users)
       let graphImages: string[] | undefined;
       let graphDataJsons: string[] | undefined;
       
-      if (graphData && graphData.length > 0) {
+      if (!isFreemiumUser && graphData && graphData.length > 0) {
         try {
           graphImages = [];
           graphDataJsons = [];
@@ -3066,8 +3098,9 @@ Respond with the refined solution only:`;
         }
       }
 
-      // For authenticated users, save assignment and deduct tokens
+      // Save assignment and handle tokens
       if (userId) {
+        // For authenticated users, save assignment and deduct tokens
         const user = await authService.getUserById(userId);
         if (user && user.username !== 'jmkuczynski' && user.username !== 'randyjohnson') {
           // Deduct tokens
@@ -3094,9 +3127,26 @@ Respond with the refined solution only:`;
           fileName: null,
           extractedText: null,
           llmProvider,
-          llmResponse: fullResponse,
+          llmResponse: finalResponse,
           graphData: graphDataJsons,
           graphImages: graphImages,
+          processingTime,
+          inputTokens: inputWords,
+          outputTokens: actualOutputWords,
+        });
+      } else {
+        // For freemium users, save preview assignment
+        await storage.createAssignment({
+          userId: null,
+          sessionId: actualSessionId,
+          inputText,
+          inputType: 'text',
+          fileName: null,
+          extractedText: null,
+          llmProvider,
+          llmResponse: finalResponse, // Save preview, not full response
+          graphData: undefined, // No graphs for freemium
+          graphImages: undefined,
           processingTime,
           inputTokens: inputWords,
           outputTokens: actualOutputWords,
@@ -3110,7 +3160,8 @@ Respond with the refined solution only:`;
           processingTime,
           graphData: graphDataJsons,
           graphImages: graphImages,
-          success: true
+          success: true,
+          isPreview: isFreemiumUser
         }
       })}\n\n`);
       
