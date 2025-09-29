@@ -2817,7 +2817,7 @@ Respond with the refined solution only:`;
         if (user.username !== 'jmkuczynski' && user.username !== 'randyjohnson') {
           // Prevent negative balance - deduct only what the user can afford
           const currentBalance = user.tokenBalance || 0;
-          const newBalance = Math.max(0, currentBalance - actualTotalTokens);
+          const newBalance = Math.max(0, currentBalance - actualTotalWords);
           await storage.updateUserTokenBalance(userId, newBalance);
           
           // Log token usage
