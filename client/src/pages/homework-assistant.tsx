@@ -1083,29 +1083,24 @@ ${fullResponse.slice(-1000)}...`;
 
   const textMutation = useMutation({
     mutationFn: async ({ text, provider }: { text: string; provider: string }) => {
-      // Use streaming for Anthropic (ZHI 1), fallback to regular for others
-      if (provider === 'anthropic') {
-        await processTextWithStreaming(text, provider);
-        return Promise.resolve({}); // Return something for the mutation
-      } else {
-        // Use regular non-streaming endpoint for other providers
-        const response = await fetch('/api/process-text', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            inputText: text, 
-            inputType: 'text',
-            llmProvider: provider,
-            sessionId: sessionId
-          }),
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to process text');
-        }
-        
-        return response.json();
+      // EMERGENCY FIX: Force all unpaid users to use regular endpoint only
+      // Use regular non-streaming endpoint for all providers until paywall is fixed
+      const response = await fetch('/api/process-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          inputText: text, 
+          inputType: 'text',
+          llmProvider: provider,
+          sessionId: sessionId
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to process text');
       }
+      
+      return response.json();
     },
     onSuccess: (data) => {
       // Only handle success for non-streaming providers (Anthropic handles its own)
