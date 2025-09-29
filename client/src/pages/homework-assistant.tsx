@@ -1593,7 +1593,7 @@ ${fullResponse.slice(-1000)}...`;
           <div className="flex flex-col space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Homework Assistant</h1>
+                <h1 className="text-2xl font-bold text-slate-900">FUCK HOMEWORK</h1>
                 <p className="text-sm text-slate-600 mt-1">AI-powered assignment solver</p>
               </div>
               {/* Token Status - Full width on its own line */}
